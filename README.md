@@ -1104,3 +1104,105 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>> me.rooms.all()
 <QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
 ```
+
+### 8. POWER ADMIN
+
+#### 8.1 Search Fields
+
+```python
+# rooms/models.py
+class Room(CommonModel):
+    # ...
+    def rating(room):
+        count = room.reviews.count()
+        if count == 0:
+            return "No Reviews"
+        else:
+            total_rating = 0
+            for review in room.reviews.all().values("rating"):
+                total_rating += review["rating"]
+            return round(total_rating / count, 2)
+```
+
+```python
+# rooms/admin.py
+class RoomAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "price",
+        "kind",
+        "total_amenities",
+        "rating",
+        "owner",
+        "created_at",
+        "updated_at",
+    )
+    
+    search_fields: (str) = (
+        "owner__username",
+        "name",
+        "^name",
+        "=price",
+    )
+```
+
+#### 8.2 Admin Actions
+
+```python
+# rooms/admin.py
+@admin.action(description="Set all prices to zero")
+def reset_prices(model_admin, request, queryset):
+    print(model_admin)
+    print(dir(request))
+    print(queryset)
+
+@admin.register(Room)
+class RoomAdmin(admin.ModelAdmin):
+    actions = (reset_prices,)
+```
+
+```python
+# reviews/admin.py
+class ReviewAdmin(admin.ModelAdmin):
+    list_filter = (
+        "rating",
+        "user__is_host",
+        "room__category",
+        "room__pet_friendly"
+    )
+```
+
+#### 8.3 Custum Filters
+```python
+# revies/admin.py
+class WordFilter(admin.SimpleListFilter):
+    title = "Filter by words!"
+    
+    parameter_name = "potato"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("good", "Good"),
+            ("great", "Great"),
+            ("awesome", "Awesome"),
+        ]
+
+    def queryset(self, request, reviews):
+        word = self.value()
+        if word:
+            return reviews.filter(payload__contains=word)
+        else:
+            return reviews
+
+class ReviewAdmin(admin.ModelAdmin):
+    list_filter = (
+        WordFilter,
+        "rating",
+        "user__is_host",
+        "room__category",
+        "room__pet_friendly",
+    )
+```
+
+### 9. URLS AND VIEWS
+
