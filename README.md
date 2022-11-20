@@ -896,3 +896,199 @@ class DirectMessagesConfig(AppConfig):
 
 ### 7. ORM
 
+#### 7.0 Introduction
+
+```shell
+$ python managy.py shell
+Python 3.11.0 (main, Oct 24 2022, 19:56:13) [GCC 11.2.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+(InteractiveConsole)
+>>> from rooms.models import Room
+>>> Room.objects.all()
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+>>> Room.objects.get(name="Beautiful House in 서울")
+<Room: Beautiful House in 서울>
+>>> room = Room.objects.get(name="Beautiful House in 서울")
+>>> room.pk
+1
+>>> room.id
+1
+>>> room.name
+'Beautiful House in 서울'
+>>> room.owner
+<User: jace>
+>>> room.owner.email
+'jace@g.com'
+>>> room.price
+1
+>>> room.price = 20
+>>> room.save()
+>>> room.amenities.all()
+<QuerySet [<Amenity: Shower>, <Amenity: Cooking basics>, <Amenity: Dishes and silverware>, <Amenity: Private entrance>]>
+>>>
+```
+
+#### 7.1 filter, get, create, delete
+
+```shell
+>>> for room in Room.objects.all():
+...     print(room.name)
+...
+Beautiful House in 서울
+Apt. in 서울
+>>> Room.objects.get(pk=1)
+<Room: Beautiful House in 서울>
+>>> Room.objects.get(pet_friendly=True)
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+  File "/home/jace/.local/share/virtualenvs/nc-airbnb-pTv2yA_W/lib/python3.11/site-packages/django/db/models/manager.py", line 85, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jace/.local/share/virtualenvs/nc-airbnb-pTv2yA_W/lib/python3.11/site-packages/django/db/models/query.py", line 653, in get
+    raise self.model.MultipleObjectsReturned(
+rooms.models.Room.MultipleObjectsReturned: get() returned more than one Room -- it returned 2!
+>>> Room.objects.filter(pet_friendly=True)
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+>>> Room.objects.filter(pet_friendly=False)
+<QuerySet []>
+>>> Room.objects.get(pk=3)
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+  File "/home/jace/.local/share/virtualenvs/nc-airbnb-pTv2yA_W/lib/python3.11/site-packages/django/db/models/manager.py", line 85, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jace/.local/share/virtualenvs/nc-airbnb-pTv2yA_W/lib/python3.11/site-packages/django/db/models/query.py", line 650, in get
+    raise self.model.DoesNotExist(
+rooms.models.Room.DoesNotExist: Room matching query does not exist.
+>>> Room.objects.filter(price__gt=15)
+<QuerySet [<Room: Beautiful House in 서울>]>
+>>> Room.objects.filter(name__contains="서울")
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+>>> Room.objects.filter(name__startswith="Apt")
+<QuerySet [<Room: Apt. in 서울>]>
+```
+
+```shell
+>>> from rooms.models import Amenity
+>>> Amenity.objects.all()
+<QuerySet [<Amenity: Shower>, <Amenity: Cooking basics>, <Amenity: Dishes and silverware>, <Amenity: Private entrance>]>
+>>> Amenity.objects.create()
+<Amenity: >
+>>> Amenity.objects.create(name="Amenity from the console", description="How cool!")
+<Amenity: Amenity from the console>
+>>> to_delete = Amenity.objects.get(pk=6)
+>>> to_delete
+<Amenity: Amenity from the console>
+>>> to_delete.delete()
+(1, {'rooms.Amenity': 1})
+```
+
+#### 7.2 QuerySets
+
+```shell
+>>> Room.objects.all()
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+>>> Room.objects.filter(pet_friendly=True)
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+>>> Room.objects.filter(pet_friendly=True).exclude(price__lt=15).filter(name__contains="서울")
+<QuerySet [<Room: Beautiful House in 서울>]>
+>>> Room.objects.filter(pet_friendly=True, name__contains="서울", price__gt=15)
+<QuerySet [<Room: Beautiful House in 서울>]>
+>>> for room in Room.objects.all():
+...     print(room.name)
+...
+Beautiful House in 서울
+Apt. in 서울
+>>> Room.objects.filter(pet_friendly=True).count()
+2
+```
+
+#### 7.3 Admin Methods
+
+```shell
+>>> Room.objects.filter(created_at__year=2022)
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+>>> Room.objects.filter(created_at__year=2021)
+<QuerySet []>
+>>> Room.objects.filter(price__lt=15).exists()
+True
+```
+
+```python
+# rooms/models.py
+class Amenity(CommonModel):
+    # ...
+    class Meta:
+        verbose_name_plural = "Amenities"
+```
+
+```python
+# rooms/admin.py
+class RoomAdmin(admin.ModelAdmin):
+    # ...
+    def total_amenities(self, room):
+        return room.amenities.count()
+```
+
+#### 7.4 ForeignKey Filter
+
+```shell
+>>> room = Room.objects.get(pk=1)
+>>> room
+<Room: Beautiful House in 서울>
+>>> room.price
+20
+>>> room.owner
+<User: jace>
+>>> room.owner.username
+'jace'
+>>> Room.objects.filter(owner__username="jace")
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+>>> Room.objects.filter(owner__username__startswith="ja")
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+```
+
+#### 7.5 Reverse Accessors
+
+```shell
+>>> from users.models import User
+>>> me = User.objects.get(pk=1)
+>>> me
+<User: jace>
+>>> dir(me)
+['CurrencyChoices', 'DoesNotExist', 'EMAIL_FIELD', 'GenderChoices', 'LanguageChoices', 'Meta', 'MultipleObjectsReturned', 'REQUIRED_FIELDS', 'USERNAME_FIELD', '__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__getstate__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__setstate__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_check_column_name_clashes', '_check_constraints', '_check_default_pk', '_check_field_name_clashes', '_check_fields', '_check_id_field', '_check_index_together', '_check_indexes', '_check_local_fields', '_check_long_column_names', '_check_m2m_through_same_relationship', '_check_managers', '_check_model', '_check_model_name_db_lookup_clashes', '_check_ordering', '_check_property_name_related_field_accessor_clashes', '_check_single_primary_key', '_check_swappable', '_check_unique_together', '_do_insert', '_do_update', '_get_FIELD_display', '_get_expr_references', '_get_field_value_map', '_get_next_or_previous_by_FIELD', '_get_next_or_previous_in_order', '_get_pk_val', '_get_unique_checks', '_meta', '_password', '_perform_date_checks', '_perform_unique_checks', '_prepare_related_fields_for_save', '_save_parents', '_save_table', '_set_pk_val', '_state', 'avatar', 'booking_set', 'chattingroom_set', 'check', 'check_password', 'clean', 'clean_fields', 'currency', 'date_error_message', 'date_joined', 'delete', 'email', 'email_user', 'experience_set', 'first_name', 'from_db', 'full_clean', 'gender', 'get_all_permissions', 'get_constraints', 'get_currency_display', 'get_deferred_fields', 'get_email_field_name', 'get_full_name', 'get_gender_display', 'get_group_permissions', 'get_language_display', 'get_next_by_date_joined', 'get_previous_by_date_joined', 'get_session_auth_hash', 'get_short_name', 'get_user_permissions', 'get_username', 'groups', 'has_module_perms', 'has_perm', 'has_perms', 'has_usable_password', 'id', 'is_active', 'is_anonymous', 'is_authenticated', 'is_host', 'is_staff', 'is_superuser', 'language', 'last_login', 'last_name', 'logentry_set', 'message_set', 'name', 'natural_key', 'normalize_username', 'objects', 'password', 'pk', 'prepare_database_save', 'refresh_from_db', 'review_set', 'room_set', 'save', 'save_base', 'serializable_value', 'set_password', 'set_unusable_password', 'unique_error_message', 'user_permissions', 'username', 'username_validator', 'validate_constraints', 'validate_unique', 'wishlist_set']
+>>> me.room_set
+<django.db.models.fields.related_descriptors.create_reverse_many_to_one_manager.<locals>.RelatedManager object at 0x7fbdb44d79d0>
+>>> me.room_set.all()
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+```
+
+#### 7.6 related_name
+
+```python
+# rooms/models.py
+class Room(CommonModel):
+    # ...
+    owner = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="rooms",
+    )
+    amenities = models.ManyToManyField(
+        "rooms.Amenity",
+        related_name="rooms",
+    )
+    category = models.ForeignKey(
+        "categories.Category",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="rooms",
+    )
+```
+
+```shell
+python manage.py makemigrations
+python manage.py migrate
+python manage.py shell
+``` 
