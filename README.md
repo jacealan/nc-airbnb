@@ -1091,4 +1091,16 @@ class Room(CommonModel):
 python manage.py makemigrations
 python manage.py migrate
 python manage.py shell
-``` 
+```
+
+```shell
+Python 3.11.0 (main, Oct 24 2022, 19:56:13) [GCC 11.2.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+(InteractiveConsole)
+>>> from users.models import User
+>>> me = User.objects.get(pk=1)
+>>> me
+<User: jace>
+>>> me.rooms.all()
+<QuerySet [<Room: Beautiful House in 서울>, <Room: Apt. in 서울>]>
+```
