@@ -1206,3 +1206,155 @@ class ReviewAdmin(admin.ModelAdmin):
 
 ### 9. URLS AND VIEWS
 
+#### 9.0 Views
+
+```python
+# config/urls.py
+from django.contrib import admin
+from django.urls import path
+from rooms import views
+
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("rooms", views.say_hello),
+]
+```
+
+```python
+# rooms/views.py
+from django.shortcuts import render
+from django.http import HttpResponse
+
+def say_hello(request):
+    return HttpResponse("hello")
+```
+
+#### 9.1 Include
+
+```python
+# config/urls.py
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("rooms/", include("rooms.urls")),
+]
+```
+
+```python
+# rooms/urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.say_hello),
+]
+```
+
+#### 9.2 URL Arguments
+
+```python
+# rooms/urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.see_all_rooms),
+    path("<int:room_id>", views.see_one_rooms),
+]
+```
+
+```python
+# rooms/views.py
+from django.shortcuts import render
+from django.http import HttpResponse
+
+def see_all_rooms(request):
+    return HttpResponse("see all rooms")
+
+def see_one_rooms(request, room_id):
+    return HttpResponse(f"see one with id: {room_id}")
+```
+
+#### 9.3 render
+
+```python
+# rooms/views.py
+def see_all_rooms(request):
+    rooms = Room.objects.all()
+    return render(
+        request,
+        "all_rooms.html",
+        {
+            "rooms": rooms,
+            "title": "Hello! this title from django",
+        },
+    )
+```
+
+```python
+# rooms/templates/all_rooms.html
+<h1>{{title}}</h1>
+```
+
+#### 9.4 Django Templates
+
+```python
+# rooms/templates/all_rooms.html
+<h3>{{title}}</h3>
+
+<ul>
+    {% for room in rooms %}
+        <li><a href="/rooms/{{room.pk}}">
+            {{room.name}}<br />
+            {% for amenity in room.amenities.all %}
+                <span>-{{amenity.name}}</span>
+            {% endfor %}
+        </a></li>
+    {% endfor %}
+</ul>
+```
+
+#### 9.5 DoesNotExist
+
+```python
+# rooms/views.py
+def see_one_rooms(request, room_pk):
+    try:
+
+        room = Room.objects.get(pk=room_pk)
+        return render(
+            request,
+            "room_detail.html",
+            {
+                "room": room,
+            },
+        )
+    except Room.DoesNotExist:
+        return render(
+            request,
+            "room_detail.html",
+            {
+                "not_found": True,
+            },
+        )
+```
+
+```python
+# rooms/templates/room_detail.html
+{% if not not_found %}
+    <h1>{{room.name}}</h1>
+
+    <h3>{{room.country}}/{{room.city}}</h3>
+    <h4>{{room.price}}</h4>
+    <p>{{room.description}}</p>
+    <h5>{{room.category.name}}</h5>
+{% else %}
+    <h1>404 not found</h1>
+{% endif %}
+```
+
+### 10. DJANGO REST FRAMEWORK
+
+#### 10.
