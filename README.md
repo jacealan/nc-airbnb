@@ -1,4 +1,6 @@
 # airbnb clone by nomadcoders lecture
+https://www.djangoproject.com/
+https://www.django-rest-framework.org/
 
 ## setup
 
@@ -204,7 +206,7 @@ pipenv install Pillow
 ```
 
 ```python
-# users/models
+# users/models.py
 class User(AbstractUser):
     class GenderChoices(models.TextChoices):
         MALE = ("male", "Male")
@@ -1357,4 +1359,423 @@ def see_one_rooms(request, room_pk):
 
 ### 10. DJANGO REST FRAMEWORK
 
-#### 10.
+#### 10.0 Introduction
+
+```shell
+pipenv install djangorestframework
+```
+
+```python
+# config/settings.py
+THIRD_PARTY_APPS = [
+    "rest_framework",
+]
+
+INSTALLED_APPS = SYSTEM_APPS + THIRD_PARTY_APPS + CUSTUM_APPS
+```
+
+#### 10.1 JsonResponse
+
+```python
+# config/urls.py
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("rooms/", include("rooms.urls")),
+    path("categories/", include("categories.urls")),
+]
+```
+
+```python
+# categories/urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.categories)
+]
+```
+
+```python
+# categories/views.py
+from django.http import JsonResponse
+from .models import Category
+
+def categories(request):
+    all_categories = Category.objects.all()
+    return JsonResponse(
+        {
+            "ok": True,
+        },
+    )
+```
+
+#### 10.2 api_view
+
+```python
+# categories/views.py
+from django.http import JsonResponse
+from django.core import serializers
+from .models import Category
+
+def categories(request):
+    all_categories = Category.objects.all()
+    return JsonResponse(
+        {
+            "ok": True,
+            "categories": serializers.serialize("json", all_categories),
+        },
+    )
+```
+
+```python
+# categories/views.py
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import Category
+
+# Create your views here.
+@api_view()
+def categories(request):
+    return Response(
+        {
+            "ok": True,
+        },
+    )
+
+```
+
+#### 10.3 Serializer
+
+```python
+# categories/serializers.py
+from rest_framework import serializers
+
+class CategorySerializer(serializers.Serializer):
+    pk = serializers.IntegerField()
+    name = serializers.CharField(required=True)
+    kind = serializers.CharField()
+    created_at = serializers.DateTimeField()
+```
+
+```python
+# categories/views.py
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import Category
+from .serializers import CategorySerializer
+
+@api_view()
+def categories(request):
+    all_categories = Category.objects.all()
+    serializer = CategorySerializer(all_categories, many=True)
+    return Response(
+        {
+            "ok": True,
+            "categories": serializer.data,
+        },
+    )
+```
+
+#### 10.4 POST Requests
+
+```python
+# categories/urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.categories),
+    path("<int:pk>", views.category),
+]
+```
+
+```python
+# categories/views.py
+@api_view()
+def category(request, pk):
+    category = Category.objects.get(pk=pk)
+    serializer = CategorySerializer(category)
+    return Response(serializer.data)
+```
+
+```python
+# categories/views.py
+@api_view(["GET", "POST"])
+def categories(request):
+    if request.method == "GET":
+        all_categories = Category.objects.all()
+        serializer = CategorySerializer(all_categories, many=True)
+        return Response(serializer.data)
+    elif request.method == "POST":
+        Category.objects.create(
+            name=request.data["name"],
+            kind=request.data["kind"],
+        )
+        return Response({"created": True})
+```
+
+#### 10.5 is_valid()
+
+```python
+# categories/serializers.py
+from rest_framework import serializers
+
+class CategorySerializer(serializers.Serializer):
+    pk = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(
+        required=True,
+        max_length=50,
+    )
+    kind = serializers.CharField(
+        max_length=15,
+    )
+    created_at = serializers.DateTimeField(read_only=True)
+```
+
+```python
+# categories/views.py
+@api_view(["GET", "POST"])
+def categories(request):
+    if request.method == "GET":
+        all_categories = Category.objects.all()
+        serializer = CategorySerializer(all_categories, many=True)
+        return Response(serializer.data)
+    elif request.method == "POST":
+        serializer = CategorySerializer(data=request.data)
+        if serializer.is_valid():
+            return Response({"created": True})
+        else:
+            return Response(serializer.errors)
+```
+
+#### 10.6 save()
+
+```python
+# categories/serializers.py
+from rest_framework import serializers
+from .models import Category
+
+class CategorySerializer(serializers.Serializer):
+    pk = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(
+        required=True,
+        max_length=50,
+    )
+    kind = serializers.ChoiceField(
+        choices=Category.CategoryKindChoices.choices,
+    )
+    created_at = serializers.DateTimeField(read_only=True)
+
+    def create(self, validated_data):
+        return Category.objects.create(**validated_data)
+```
+
+```python
+# categories/views.py
+@api_view(["GET", "POST"])
+def categories(request):
+    if request.method == "GET":
+        all_categories = Category.objects.all()
+        serializer = CategorySerializer(all_categories, many=True)
+        return Response(serializer.data)
+    elif request.method == "POST":
+        serializer = CategorySerializer(data=request.data)
+        if serializer.is_valid():
+            new_category = serializer.save()
+            return Response(
+                CategorySerializer(new_category).data,
+            )
+        else:
+            # name=validated_data["name"],
+            # kind=validated_data["kind"],
+            return Response(serializer.errors)  
+```
+
+#### 10.7 update()
+
+```python
+# categories/serializers.py
+from rest_framework import serializers
+from .models import Category
+
+class CategorySerializer(serializers.Serializer):
+    # ...
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get("name", instance.name)
+        instance.kind = validated_data.get("kind", instance.kind)
+        instance.save()
+        return instance
+```
+
+```python
+# categories/views.py
+from rest_framework.decorators import api_view
+from rest_framework.exceptions import NotFound
+from rest_framework.response import Response
+from .models import Category
+from .serializers import CategorySerializer
+
+# ...
+
+@api_view(["GET", "PUT"])
+def category(request, pk):
+    try:
+        category = Category.objects.get(pk=pk)
+    except Category.DoesNotExist:
+        raise NotFound
+
+    if request.method == "GET":
+        try:
+            serializer = CategorySerializer(category)
+            return Response(serializer.data)
+        except Category.DoesNotExist:
+            raise NotFound
+    elif request.method == "PUT":
+        serializer = CategorySerializer(
+            category,
+            data=request.data,
+            partial=True,
+        )
+        if serializer.is_valid():
+            updated_category = serializer.save()
+            return Response(CategorySerializer(updated_category).data)
+        else:
+            return Response(serializer.errors)
+```
+
+#### 10.8 DELETE
+
+```python
+# categories/views.py
+from rest_framework.decorators import api_view
+from rest_framework.exceptions import NotFound
+from rest_framework.response import Response
+from rest_framework.status import HTTP_204_NO_CONTENT
+from .models import Category
+from .serializers import CategorySerializer
+
+# ...
+
+@api_view(["GET", "PUT", "DELETE"])
+def category(request, pk):
+    # ...
+    elif request.method == "DELETE":
+        category.delete()
+        return Response(status=HTTP_204_NO_CONTENT)
+```
+
+```python
+# config/urls.py
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("api/v1/rooms/", include("rooms.urls")),
+    path("api/v1/categories/", include("categories.urls")),
+]
+```
+
+#### 10.9 Recap
+#### 10.10 APIView
+
+```python
+# categories/views.py
+from rest_framework.views import APIView
+
+class Categories(APIView):
+    def get(self, request):
+        all_categories = Category.objects.all()
+        serializer = CategorySerializer(all_categories, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = CategorySerializer(data=request.data)
+        if serializer.is_valid():
+            new_category = serializer.save()
+            return Response(CategorySerializer(new_category).data)
+        else:
+            return Response(serializer.errors)
+
+class CategoryDetail(APIView):
+    def get_object(self, pk):
+        try:
+            category = Category.objects.get(pk=pk)
+        except Category.DoesNotExist:
+            raise NotFound
+        return category
+
+    def get(self, request, pk):
+        serializer = CategorySerializer(self.get_object(pk))
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        serializer = CategorySerializer(
+            self.get_object(pk),
+            data=request.data,
+            partial=True,
+        )
+        if serializer.is_valid():
+            updated_category = serializer.save()
+            return Response(CategorySerializer(updated_category).data)
+        else:
+            return Response(serializer.errors)
+
+    def delete(self, request, pk):
+        self.get_object(pk).delete()
+        return Response(status=HTTP_204_NO_CONTENT)
+```
+
+```python
+# categories/urls.py
+urlpatterns = [
+    path("", views.Categories.as_view()),
+    path("<int:pk>", views.CategoryDetail.as_view()),
+]
+```
+
+#### 10.11 ModelSerializer
+
+```python
+# categories/serializers.py
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = "__all__"
+```
+
+#### 10.12 ModelViewSet
+
+```python
+# categories/views.py
+class CategoryViewSet(ModelViewSet):
+    serializer_class = CategorySerializer
+    queryset = Category.objects.all()
+```
+
+```python
+# categories/urls.pyurlpatterns = [
+    # path("", views.categories),
+    # path("<int:pk>", views.category),
+    # path("", views.Categorie.as_view()),
+    # path("<int:pk>", views.CategoryDetail.as_view()),
+    path(
+        "",
+        views.CategorieViewSet.as_view(
+            {
+                "get": "list",
+                "post": "create",
+            }
+        ),
+    ),
+    path(
+        "<int:pk>",
+        views.CategoryViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+    ),
+]
+```
+
+#### 10.13 Conclusions
